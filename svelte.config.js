@@ -6,15 +6,10 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 const config = {
   preprocess: vitePreprocess(),
   kit: {
-    adapter: adapter({
-      // ✅ Especificar rutas explícitas para evitar ambigüedades
-      routes: {
-        include: ['/*'],
-        exclude: ['<all>']
-      }
-    }),
+    adapter: adapter(),  // ✅ Sin configuración especial necesaria
+    // ✅ Esta línea asegura que las variables PUBLIC_ estén disponibles
     env: {
-      publicPrefix: 'PUBLIC_'  // ✅ Importante para variables de entorno
+      publicPrefix: 'PUBLIC_'
     }
   }
 };

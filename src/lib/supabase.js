@@ -1,23 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
+// ✅ Usar el método oficial de SvelteKit para variables públicas
+import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
 
-// 🔍 DEBUG: Verificar variables de entorno
-console.log('🔍 [Supabase] Debug de variable:');
-console.log('  PUBLIC_SUPABASE_URL:', import.meta.env.PUBLIC_SUPABASE_URL);
-console.log('  PUBLIC_SUPABASE_ANON_KEY:', import.meta.env.PUBLIC_SUPABASE_ANON_KEY?.substring(0, 20) + '...');
-console.log('  import.meta.env:', import.meta.env);
+console.log('🔍 [Supabase] Iniciando cliente...');
+console.log('🔗 URL:', PUBLIC_SUPABASE_URL?.substring(0, 30) + '...');
+console.log('🔑 Key presente:', !!PUBLIC_SUPABASE_ANON_KEY);
 
-const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
-
-// ✅ Validación explícita antes de crear el cliente
-if (!supabaseUrl) {
-  console.error('❌ [Supabase] PUBLIC_SUPABASE_URL no está definida o está vacía');
-  throw new Error('PUBLIC_SUPABASE_URL is required. Revisa las variables de entorno en Cloudflare Pages.');
+// Validación explícita
+if (!PUBLIC_SUPABASE_URL) {
+  console.error('❌ PUBLIC_SUPABASE_URL no está definida');
+  throw new Error('PUBLIC_SUPABASE_URL is required. Revisa las variables en Cloudflare Pages.');
 }
 
-if (!supabaseAnonKey) {
-  console.error('❌ [Supabase] PUBLIC_SUPABASE_ANON_KEY no está definida o está vacía');
-  throw new Error('PUBLIC_SUPABASE_ANON_KEY is required. Revisa las variables de entorno en Cloudflare Pages.');
+if (!PUBLIC_SUPABASE_ANON_KEY) {
+  console.error('❌ PUBLIC_SUPABASE_ANON_KEY no está definida');
+  throw new Error('PUBLIC_SUPABASE_ANON_KEY is required. Revisa las variables en Cloudflare Pages.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY);
