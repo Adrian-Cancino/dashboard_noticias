@@ -28,6 +28,24 @@
   let fechaInicio = '';
   let fechaFin = '';
 
+  function getFechaLocal() {
+  const ahora = new Date();
+  const year = ahora.getFullYear();
+  const month = String(ahora.getMonth() + 1).padStart(2, '0');
+  const day = String(ahora.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+  }
+
+  // 🕐 Función para restar días manteniendo zona horaria local
+  function getFechaLocalHace(dias) {
+    const fecha = new Date();
+    fecha.setDate(fecha.getDate() - dias);
+    const year = fecha.getFullYear();
+    const month = String(fecha.getMonth() + 1).padStart(2, '0');
+    const day = String(fecha.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -73,28 +91,26 @@
 
   // 📅 Funciones de filtro rápido
   function filtrarHoy() {
-    const hoy = new Date().toISOString().split('T')[0];
+    const hoy = getFechaLocal();  // ✅ Usa hora local en lugar de UTC
     fechaInicio = hoy;
     fechaFin = hoy;
     cargarDatos(hoy, hoy);
   }
 
   function filtrarUltimos7Dias() {
-    const fin = new Date();
-    const inicio = new Date();
-    inicio.setDate(inicio.getDate() - 7);
-    fechaInicio = inicio.toISOString().split('T')[0];
-    fechaFin = fin.toISOString().split('T')[0];
-    cargarDatos(fechaInicio, fechaFin);
+    const fin = getFechaLocal();
+    const inicio = getFechaLocalHace(7);
+    fechaInicio = inicio;
+    fechaFin = fin;
+    cargarDatos(inicio, fin);
   }
 
   function filtrarUltimos30Dias() {
-    const fin = new Date();
-    const inicio = new Date();
-    inicio.setDate(inicio.getDate() - 30);
-    fechaInicio = inicio.toISOString().split('T')[0];
-    fechaFin = fin.toISOString().split('T')[0];
-    cargarDatos(fechaInicio, fechaFin);
+    const fin = getFechaLocal();
+    const inicio = getFechaLocalHace(30);
+    fechaInicio = inicio;
+    fechaFin = fin;
+    cargarDatos(inicio, fin);
   }
 
   function filtrarTodo() {
