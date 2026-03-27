@@ -1,3 +1,4 @@
+// svelte.config.js
 import adapter from '@sveltejs/adapter-cloudflare';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
@@ -5,9 +6,15 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 const config = {
   preprocess: vitePreprocess(),
   kit: {
-    adapter: adapter(),
+    adapter: adapter({
+      // ✅ Especificar rutas explícitas para evitar ambigüedades
+      routes: {
+        include: ['/*'],
+        exclude: ['<all>']
+      }
+    }),
     env: {
-      publicPrefix: 'PUBLIC_'  // Variables que pueden exponerse al cliente
+      publicPrefix: 'PUBLIC_'  // ✅ Importante para variables de entorno
     }
   }
 };
