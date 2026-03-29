@@ -12,7 +12,15 @@
     Legend
   } from 'chart.js';
   
-  import { loading, error, resumen, cargarDatos } from '$lib/stores';
+  import { 
+    loading, 
+    error, 
+    resumen, 
+    cargarDatos, 
+    obtenerMediosUnicos,
+    personasDisponibles,
+    filtrosActivos 
+  } from '$lib/stores';
 
   ChartJS.register(
     CategoryScale,
@@ -27,24 +35,13 @@
   // 📅 Estado para los filtros de fecha
   let fechaInicio = '';
   let fechaFin = '';
-
-  function getFechaLocal() {
-  const ahora = new Date();
-  const year = ahora.getFullYear();
-  const month = String(ahora.getMonth() + 1).padStart(2, '0');
-  const day = String(ahora.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-  }
-
-  // 🕐 Función para restar días manteniendo zona horaria local
-  function getFechaLocalHace(dias) {
-    const fecha = new Date();
-    fecha.setDate(fecha.getDate() - dias);
-    const year = fecha.getFullYear();
-    const month = String(fecha.getMonth() + 1).padStart(2, '0');
-    const day = String(fecha.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
+  
+  // 👤📰 Estado para filtros de persona y medio
+  let personaSeleccionada = '';
+  let medioSeleccionado = '';
+  
+  // 📰 Lista de medios disponibles (se carga dinámicamente)
+  let mediosDisponibles = [];
 
   const chartOptions = {
     responsive: true,
@@ -81,55 +78,89 @@
     gray: 'rgba(201, 203, 207, 0.8)'
   };
 
-  onMount(() => {
+  onMount(async () => {
+    // Cargar lista de medios disponibles
+    mediosDisponibles = await obtenerMediosUnicos();
+    // Cargar datos iniciales
     cargarDatos();
   });
 
   function recargar() {
-    cargarDatos(fechaInicio || null, fechaFin || null);
+    cargarDatos({
+      fechaInicio: fechaInicio || null,
+      fechaFin: fechaFin || null,
+      persona: personaSeleccionada || null,
+      medio: medioSeleccionado || null
+    });
   }
 
   // 📅 Funciones de filtro rápido
   function filtrarHoy() {
-    const hoy = getFechaLocal();  // ✅ Usa hora local en lugar de UTC
+    const hoy = new Date().toISOString().split('T')[0];
     fechaInicio = hoy;
     fechaFin = hoy;
-    cargarDatos(hoy, hoy);
+    aplicarFiltro();
   }
 
   function filtrarUltimos7Dias() {
-    const fin = getFechaLocal();
-    const inicio = getFechaLocalHace(7);
-    fechaInicio = inicio;
-    fechaFin = fin;
-    cargarDatos(inicio, fin);
+    const fin = new Date();
+    const inicio = new Date();
+    inicio.setDate(inicio.getDate() - 7);
+    fechaInicio = inicio.toISOString().split('T')[0];
+    fechaFin = fin.toISOString().split('T')[0];
+    aplicarFiltro();
   }
 
   function filtrarUltimos30Dias() {
-    const fin = getFechaLocal();
-    const inicio = getFechaLocalHace(30);
-    fechaInicio = inicio;
-    fechaFin = fin;
-    cargarDatos(inicio, fin);
+    const fin = new Date();
+    const inicio = new Date();
+    inicio.setDate(inicio.getDate() - 30);
+    fechaInicio = inicio.toISOString().split('T')[0];
+    fechaFin = fin.toISOString().split('T')[0];
+    aplicarFiltro();
   }
 
   function filtrarTodo() {
     fechaInicio = '';
     fechaFin = '';
+    personaSeleccionada = '';
+    medioSeleccionado = '';
     cargarDatos();
   }
 
-  // 📅 Aplicar filtro personalizado
+  // 🔍 Aplicar todos los filtros
   function aplicarFiltro() {
-    cargarDatos(fechaInicio || null, fechaFin || null);
+    cargarDatos({
+      fechaInicio: fechaInicio || null,
+      fechaFin: fechaFin || null,
+      persona: personaSeleccionada || null,
+      medio: medioSeleccionado || null
+    });
   }
 
-  // 📅 Limpiar filtros
+  // 🧹 Limpiar todos los filtros
   function limpiarFiltros() {
     fechaInicio = '';
     fechaFin = '';
+    personaSeleccionada = '';
+    medioSeleccionado = '';
     cargarDatos();
   }
+
+  // 👤 Limpiar solo filtro de persona
+  function limpiarPersona() {
+    personaSeleccionada = '';
+    aplicarFiltro();
+  }
+
+  // 📰 Limpiar solo filtro de medio
+  function limpiarMedio() {
+    medioSeleccionado = '';
+    aplicarFiltro();
+  }
+
+  // ✅ Verificar si hay filtros activos
+  $: hayFiltrosActivos = fechaInicio || fechaFin || personaSeleccionada || medioSeleccionado;
 </script>
 
 <div class="dashboard">
@@ -155,33 +186,86 @@
       <p>⏳ Cargando datos...</p>
     </div>
   {:else}
-    <!-- 🔍 Filtros de Fecha -->
+    <!-- 🔍 Filtros -->
     <section class="filters-section">
-      <div class="filters-group">
-        <label>📅 Fecha Inicio:</label>
-        <input 
-          type="date" 
-          bind:value={fechaInicio} 
-          class="date-input"
-        />
+      <div class="filters-header">
+        <h3 class="filters-title">🔍 Filtros de Búsqueda</h3>
+        <div class="filters-actions">
+          <button on:click={aplicarFiltro} class="btn-apply">
+            🔍 Aplicar
+          </button>
+          <button on:click={limpiarFiltros} class="btn-clear" disabled={!hayFiltrosActivos}>
+            🧹 Limpiar
+          </button>
+        </div>
       </div>
       
-      <div class="filters-group">
-        <label>📅 Fecha Fin:</label>
-        <input 
-          type="date" 
-          bind:value={fechaFin} 
-          class="date-input"
-        />
-      </div>
+      <div class="filters-grid">
+        <!-- Fecha Inicio -->
+        <div class="filters-group">
+          <label for="fecha-inicio">📅 Fecha Inicio</label>
+          <input 
+            id="fecha-inicio"
+            type="date" 
+            bind:value={fechaInicio} 
+            class="date-input"
+          />
+        </div>
+        
+        <!-- Fecha Fin -->
+        <div class="filters-group">
+          <label for="fecha-fin">📅 Fecha Fin</label>
+          <input 
+            id="fecha-fin"
+            type="date" 
+            bind:value={fechaFin} 
+            class="date-input"
+          />
+        </div>
 
-      <div class="filters-actions">
-        <button on:click={aplicarFiltro} class="btn-apply">
-          🔍 Aplicar Filtro
-        </button>
-        <button on:click={limpiarFiltros} class="btn-clear">
-          🧹 Limpiar
-        </button>
+        <!-- Filtro por Persona -->
+        <div class="filters-group">
+          <label for="persona-select">👤 Persona</label>
+          <div class="select-wrapper">
+            <select 
+              id="persona-select"
+              bind:value={personaSeleccionada} 
+              class="select-input"
+            >
+              <option value="">Todas las personas</option>
+              {#each personasDisponibles as persona}
+                <option value={persona}>{persona}</option>
+              {/each}
+            </select>
+            {#if personaSeleccionada}
+              <button on:click={limpiarPersona} class="btn-clear-small" title="Limpiar filtro" type="button">
+                ✕
+              </button>
+            {/if}
+          </div>
+        </div>
+
+        <!-- Filtro por Medio -->
+        <div class="filters-group">
+          <label for="medio-select">📰 Medio</label>
+          <div class="select-wrapper">
+            <select 
+              id="medio-select"
+              bind:value={medioSeleccionado} 
+              class="select-input"
+            >
+              <option value="">Todos los medios</option>
+              {#each mediosDisponibles as medio}
+                <option value={medio}>{medio}</option>
+              {/each}
+            </select>
+            {#if medioSeleccionado}
+              <button on:click={limpiarMedio} class="btn-clear-small" title="Limpiar filtro" type="button">
+                ✕
+              </button>
+            {/if}
+          </div>
+        </div>
       </div>
     </section>
 
@@ -366,6 +450,7 @@
   button:disabled {
     background: #94c4f7;
     cursor: not-allowed;
+    opacity: 0.7;
   }
 
   /* 🔍 Sección de Filtros */
@@ -376,58 +461,133 @@
     padding: 20px 25px;
     margin-bottom: 20px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+
+  .filters-header {
     display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e1e4e8;
     flex-wrap: wrap;
+    gap: 15px;
+  }
+
+  .filters-title {
+    margin: 0;
+    font-size: 16px;
+    color: #24292e;
+    font-weight: 600;
+  }
+
+  .filters-actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  .filters-actions .btn-apply {
+    background: #28a745;
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+
+  .filters-actions .btn-apply:hover {
+    background: #218838;
+  }
+
+  .filters-actions .btn-clear {
+    background: #6c757d;
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+
+  .filters-actions .btn-clear:hover {
+    background: #5a6268;
+  }
+
+  .filters-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
     gap: 20px;
-    align-items: flex-end;
   }
 
   .filters-group {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
+    min-width: 0;
   }
 
   .filters-group label {
     font-size: 13px;
     font-weight: 600;
     color: #586069;
+    white-space: nowrap;
   }
 
-  .date-input {
-    padding: 10px 14px;
-    border: 1px solid #e1e4e8;
+  .date-input,
+  .select-input {
+    padding: 10px 12px;
+    border: 1px solid #d1d5da;
     border-radius: 6px;
     font-size: 14px;
     font-family: inherit;
-    min-width: 160px;
     cursor: pointer;
+    background: white;
+    width: 100%;
+    box-sizing: border-box;
+    transition: border-color 0.2s, box-shadow 0.2s;
   }
 
-  .date-input:hover {
+  .date-input:hover,
+  .select-input:hover {
     border-color: #0366d6;
   }
 
-  .filters-actions {
+  .date-input:focus,
+  .select-input:focus {
+    outline: none;
+    border-color: #0366d6;
+    box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.15);
+  }
+
+  .select-wrapper {
+    position: relative;
     display: flex;
-    gap: 10px;
-    margin-left: auto;
+    align-items: center;
+    width: 100%;
   }
 
-  .btn-apply {
-    background: #28a745;
+  .select-wrapper select {
+    padding-right: 35px;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
   }
 
-  .btn-apply:hover {
-    background: #218838;
+  .btn-clear-small {
+    position: absolute;
+    right: 8px;
+    background: #e1e4e8;
+    color: #586069;
+    border: none;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.2s, color 0.2s;
   }
 
-  .btn-clear {
-    background: #6c757d;
-  }
-
-  .btn-clear:hover {
-    background: #5a6268;
+  .btn-clear-small:hover {
+    background: #c5221f;
+    color: white;
   }
 
   /* ⚡ Filtros Rápidos */
@@ -457,6 +617,7 @@
     border: 1px solid #e1e4e8;
     padding: 8px 16px;
     font-size: 13px;
+    border-radius: 6px;
   }
 
   .btn-quick:hover {
@@ -569,6 +730,12 @@
   }
 
   /* Responsive */
+  @media (max-width: 1200px) {
+    .filters-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
   @media (max-width: 1024px) {
     .charts-grid {
       grid-template-columns: 1fr;
@@ -587,13 +754,17 @@
       height: 320px;
     }
 
-    .filters-section {
+    .filters-header {
       flex-direction: column;
-      align-items: stretch;
+      align-items: flex-start;
     }
 
     .filters-actions {
-      margin-left: 0;
+      width: 100%;
+    }
+
+    .filters-actions button {
+      flex: 1;
     }
   }
 
@@ -622,7 +793,24 @@
       align-items: stretch;
     }
 
+    .quick-filters-label {
+      margin-right: 0;
+      margin-bottom: 10px;
+    }
+
     .btn-quick {
+      width: 100%;
+    }
+
+    .filters-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .filters-actions {
+      flex-direction: column;
+    }
+
+    .filters-actions button {
       width: 100%;
     }
   }

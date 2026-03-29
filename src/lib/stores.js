@@ -12,21 +12,40 @@ export const resumen = writable({
   mencionesPersonas: []
 });
 
+export const filtrosActivos = writable({
+  fechaInicio: null,
+  fechaFin: null,
+  persona: null,
+  medio: null
+});
+
 function esVerdadero(valor) {
   if (!valor) return false;
   const v = valor.toString().toLowerCase().trim();
   return v === 'true' || v === 'si' || v === '1' || v === 'yes';
 }
 
-// ✅ Función modificada para aceptar filtros de fecha
-export async function cargarDatos(fechaInicio = null, fechaFin = null) {
+// ✅ Función corregida - el filtro por persona se aplica después de obtener los datos
+export async function cargarDatos({
+  fechaInicio = null,
+  fechaFin = null,
+  persona = null,
+  medio = null
+} = {}) {
   loading.set(true);
   error.set(null);
 
-  try {
-    console.log('🔄 [1/5] Iniciando carga...', { fechaInicio, fechaFin });
+  filtrosActivos.set({
+    fechaInicio,
+    fechaFin,
+    persona,
+    medio
+  });
 
-    // Construir consulta base
+  try {
+    console.log('🔄 [1/5] Iniciando carga...', { fechaInicio, fechaFin, persona, medio });
+
+    // Construir consulta base (SOLO filtros que Supabase soporta en server)
     let query = supabase
       .from('noticias')
       .select(`
@@ -47,19 +66,25 @@ export async function cargarDatos(fechaInicio = null, fechaFin = null) {
         )
       `);
 
-    // 📅 Aplicar filtro de fecha inicio (inclusive desde 00:00:00)
+    // 📅 Filtro de fecha inicio
     if (fechaInicio) {
       query = query.gte('fecha_nota', `${fechaInicio}T00:00:00`);
       console.log('📅 Filtro inicio aplicado:', fechaInicio);
     }
 
-    // 📅 Aplicar filtro de fecha fin (inclusive hasta 23:59:59)
+    // 📅 Filtro de fecha fin
     if (fechaFin) {
       query = query.lte('fecha_nota', `${fechaFin}T23:59:59`);
       console.log('📅 Filtro fin aplicado:', fechaFin);
     }
 
-    // Ejecutar consulta con ordenamiento
+    // 📰 Filtro por medio (este SÍ funciona en server)
+    if (medio) {
+      query = query.eq('medio', medio);
+      console.log('📰 Filtro medio aplicado:', medio);
+    }
+
+    // Ejecutar consulta
     const { data: noticiasData, error: errorNoticias } = await query
       .order('fecha_nota', { ascending: false });
 
@@ -75,7 +100,7 @@ export async function cargarDatos(fechaInicio = null, fechaFin = null) {
     }
 
     if (!noticiasData || noticiasData.length === 0) {
-      console.warn('⚠️ [3/5] No hay datos para el rango seleccionado');
+      console.warn('⚠️ [3/5] No hay datos para los filtros seleccionados');
       resumen.set({
         totalNoticias: 0,
         porMedio: [],
@@ -87,10 +112,8 @@ export async function cargarDatos(fechaInicio = null, fechaFin = null) {
       return;
     }
 
-    console.log('🔄 [4/5] Procesando', noticiasData.length, 'noticias...');
-
     // Procesar datos: aplanar la estructura del JOIN
-    const datosProcesados = noticiasData.map(nota => {
+    let datosProcesados = noticiasData.map(nota => {
       const analisis = Array.isArray(nota.analisis_noticias) 
         ? nota.analisis_noticias[0] 
         : nota.analisis_noticias;
@@ -101,11 +124,37 @@ export async function cargarDatos(fechaInicio = null, fechaFin = null) {
       };
     });
 
+    // 👤 FILTRO POR PERSONA (CLIENTE-SIDE) - Supabase no permite filtrar en tablas relacionadas
+    if (persona) {
+      const campoPersona = getCampoPersona(persona);
+      if (campoPersona) {
+        console.log('👤 Filtrado por persona (cliente):', persona, '->', campoPersona);
+        datosProcesados = datosProcesados.filter(nota => 
+          esVerdadero(nota.analisis?.[campoPersona])
+        );
+        console.log('👤 Después del filtro:', datosProcesados.length, 'noticias');
+      }
+    }
+
+    if (datosProcesados.length === 0) {
+      console.warn('⚠️ [4/5] No hay datos después de aplicar filtros');
+      resumen.set({
+        totalNoticias: 0,
+        porMedio: [],
+        porSentimiento: [],
+        porClasificacion: [],
+        mencionesPersonas: []
+      });
+      loading.set(false);
+      return;
+    }
+
+    console.log('🔄 [4/5] Procesando', datosProcesados.length, 'noticias...');
+
     const procesados = procesarDatos(datosProcesados);
     
     console.log('🔄 [5/5] Resumen:', procesados);
 
-    // Actualizar stores
     noticias.set(datosProcesados);
     resumen.set(procesados);
     
@@ -117,10 +166,49 @@ export async function cargarDatos(fechaInicio = null, fechaFin = null) {
   }
 }
 
+function getCampoPersona(nombre) {
+  const mapeo = {
+    'Arreola': 'mencion_arreola',
+    'Ruth': 'mencion_ruth',
+    'Gerardo': 'mencion_gerardo',
+    'Rosa': 'mencion_rosa',
+    'Cuaihtli': 'mencion_cuaihtli',
+    'Valladares': 'mencion_valladares',
+    'Rita': 'mencion_rita'
+  };
+  return mapeo[nombre] || null;
+}
+
+export async function obtenerMediosUnicos() {
+  try {
+    const { data, error } = await supabase
+      .from('noticias')
+      .select('medio')
+      .not('medio', 'is', null);
+    
+    if (error) throw error;
+    
+    const mediosUnicos = [...new Set(data.map(d => d.medio))].sort();
+    return mediosUnicos;
+  } catch (err) {
+    console.error('Error al obtener medios:', err);
+    return [];
+  }
+}
+
+export const personasDisponibles = [
+  'Arreola',
+  'Ruth',
+  'Gerardo',
+  'Rosa',
+  'Cuaihtli',
+  'Valladares',
+  'Rita'
+];
+
 function procesarDatos(datos) {
   const totalNoticias = datos.length;
   
-  // --- Contar por Medio ---
   const porMedioMap = {};
   datos.forEach(nota => {
     const medio = nota.medio || 'Sin Medio';
@@ -128,7 +216,6 @@ function procesarDatos(datos) {
   });
   const porMedio = Object.entries(porMedioMap).map(([medio, cantidad]) => ({ medio, cantidad }));
 
-  // --- Contar por Sentimiento ---
   const porSentimientoMap = {};
   datos.forEach(nota => {
     const sentimiento = nota.analisis?.sentimiento || 'Sin Clasificar';
@@ -136,7 +223,6 @@ function procesarDatos(datos) {
   });
   const porSentimiento = Object.entries(porSentimientoMap).map(([sentimiento, cantidad]) => ({ sentimiento, cantidad }));
 
-  // --- Contar por Clasificación ---
   const porClasificacionMap = {};
   datos.forEach(nota => {
     const clasificacion = nota.analisis?.clasificacion || 'Sin Clasificar';
@@ -144,7 +230,6 @@ function procesarDatos(datos) {
   });
   const porClasificacion = Object.entries(porClasificacionMap).map(([clasificacion, cantidad]) => ({ clasificacion, cantidad }));
 
-  // --- Contar Menciones por Persona ---
   const personas = [
     { campo: 'mencion_arreola', nombre: 'Arreola' },
     { campo: 'mencion_ruth', nombre: 'Ruth' },

@@ -1,4 +1,3 @@
-// svelte.config.js
 import adapter from '@sveltejs/adapter-cloudflare';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
@@ -6,10 +5,9 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 const config = {
   preprocess: vitePreprocess(),
   kit: {
-    adapter: adapter(),  // ✅ Sin configuración especial necesaria
-    // ✅ Esta línea asegura que las variables PUBLIC_ estén disponibles
+    adapter: adapter(),
     env: {
-      publicPrefix: 'PUBLIC_'
+      publicPrefix: 'PUBLIC_'  // Variables que pueden exponerse al cliente
     }
   }
 };
