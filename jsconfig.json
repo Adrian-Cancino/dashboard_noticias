@@ -6,6 +6,9 @@
 		"skipLibCheck": true,
 		"sourceMap": true,
 		"module": "NodeNext",
-		"moduleResolution": "NodeNext"
+		"moduleResolution": "NodeNext",
+		"types": [
+			"./worker-configuration.d.ts"
+		]
 	}
 }
