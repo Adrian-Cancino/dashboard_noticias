@@ -8,7 +8,7 @@
 		"prepare": "svelte-kit sync || echo ''",
 		"prepack": "svelte-kit sync && svelte-package && publint",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    	"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
 	},
 	"files": [
 		"dist",
@@ -47,6 +47,7 @@
 	"dependencies": {
 		"@supabase/supabase-js": "^2.100.1",
 		"chart.js": "^4.5.1",
+		"leaflet": "^1.9.4",
 		"svelte-chartjs": "^4.0.1"
 	}
 }

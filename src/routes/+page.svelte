@@ -398,14 +398,12 @@
 </div>
 
 <style>
-  .dashboard {
-    max-width: 1600px;
-    margin: 0 auto;
-    padding: 30px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #f6f8fa;
-    min-height: 100vh;
-  }
+   .dashboard {
+     max-width: 1600px;
+     margin: 0 auto;
+     padding: 30px;
+     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+   }
 
   header {
     display: flex;
