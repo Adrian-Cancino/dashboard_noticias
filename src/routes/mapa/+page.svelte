@@ -11,9 +11,16 @@
   let distritoSeleccionado = '';
   let municipios = [];
   let municipioSeleccionado = '';
+  let rangosVotosTotales = [];
+  let rangoSeleccionado = '';
   let geoLayers = [];
    let allData = [];
-   let resultadosData = [];
+    let resultadosData = [];
+
+  function formatNumber(num) {
+    if (num === null || num === undefined) return '0';
+    return num.toLocaleString('es-MX');
+  }
 
   async function cargarDatos() {
     try {
@@ -91,9 +98,28 @@
         const resultadosSecciones = new Set(Object.keys(resultadosPorSeccion));
         const coinciden = [...geoSecciones].filter(sec => resultadosSecciones.has(sec));
 
+        // Calcular quintiles de votos totales (votos_emitidos + abstencion)
+        const votosTotalesPorSeccion = Object.values(resultadosPorSeccion).map(r => (r.votos_emitidos || 0) + (r.abstencion || 0));
+        votosTotalesPorSeccion.sort((a, b) => a - b);
+        const quintiles = [];
+        const numQuintiles = 5;
+        if (votosTotalesPorSeccion.length > 0) {
+          const segmentSize = Math.ceil(votosTotalesPorSeccion.length / numQuintiles);
+          for (let i = 0; i < numQuintiles; i++) {
+            const startIdx = i * segmentSize;
+            const endIdx = Math.min(startIdx + segmentSize, votosTotalesPorSeccion.length) - 1;
+            const min = votosTotalesPorSeccion[startIdx];
+            const max = votosTotalesPorSeccion[endIdx];
+            const label = `${i === 0 ? 'Muy bajo' : i === 1 ? 'Bajo' : i === 2 ? 'Medio' : i === 3 ? 'Alto' : 'Muy alto'} (${formatNumber(min)} - ${formatNumber(max)})`;
+            quintiles.push({ min, max, label });
+          }
+        } else {
+          // Si no hay datos, crear un rango vacío
+          quintiles.push({ min: 0, max: 0, label: 'Sin datos' });
+        }
+        rangosVotosTotales = quintiles;
 
-
-       // Combinar datos geográficos con resultados
+        // Combinar datos geográficos con resultados
        allData = geoData.map(geoRow => {
          const seccion = normalizarSeccion(geoRow.seccion);
          const resultadosSeccion = resultadosPorSeccion[seccion] || null;
@@ -145,17 +171,20 @@
     return `hsl(0, 70%, ${lightness}%)`;
   }
 
-  function formatNumber(num) {
-    if (num === null || num === undefined) return '0';
-    return num.toLocaleString('es-MX');
-  }
+
 
   function obtenerDatosFiltrados() {
     return allData.filter(row => {
       const cumpleDistrito = !distritoSeleccionado || row.distrito_l === distritoSeleccionado;
       const cumpleMunicipio = !municipioSeleccionado || 
         (row.resultados && row.resultados.municipio === municipioSeleccionado);
-      return cumpleDistrito && cumpleMunicipio;
+      const cumpleRango = !rangoSeleccionado || (() => {
+        const rango = rangosVotosTotales.find(r => r.label === rangoSeleccionado);
+        if (!rango) return true;
+        const votosTotales = row.resultados ? (row.resultados.votos_emitidos || 0) + (row.resultados.abstencion || 0) : 0;
+        return votosTotales >= rango.min && votosTotales <= rango.max;
+      })();
+      return cumpleDistrito && cumpleMunicipio && cumpleRango;
     });
   }
 
@@ -306,9 +335,15 @@
     dibujarPoligonos();
   }
 
+  function limpiarFiltroRango() {
+    rangoSeleccionado = '';
+    dibujarPoligonos();
+  }
+
   function limpiarTodosFiltros() {
     distritoSeleccionado = '';
     municipioSeleccionado = '';
+    rangoSeleccionado = '';
     dibujarPoligonos();
   }
 
@@ -371,6 +406,23 @@
           </select>
           {#if municipioSeleccionado}
             <button on:click={limpiarFiltroMunicipio} class="btn-clear-small" title="Limpiar filtro" type="button">
+              ✕
+            </button>
+          {/if}
+        </div>
+      </div>
+      
+      <div class="filter-group">
+        <label for="rango-votos">Votos Totales</label>
+        <div class="select-wrapper">
+          <select id="rango-votos" bind:value={rangoSeleccionado} on:change={aplicarFiltro} class="select-input">
+            <option value="">Todos</option>
+            {#each rangosVotosTotales as rango}
+              <option value={rango.label}>{rango.label}</option>
+            {/each}
+          </select>
+          {#if rangoSeleccionado}
+            <button on:click={limpiarFiltroRango} class="btn-clear-small" title="Limpiar filtro" type="button">
               ✕
             </button>
           {/if}
