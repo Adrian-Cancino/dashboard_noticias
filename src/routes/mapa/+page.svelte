@@ -11,11 +11,10 @@
   let distritoSeleccionado = '';
   let municipios = [];
   let municipioSeleccionado = '';
-  let rangosVotosTotales = [];
-  let rangoSeleccionado = '';
   let geoLayers = [];
-   let allData = [];
-    let resultadosData = [];
+    let allData = [];
+     let resultadosData = [];
+     let maxVotosCache = 0;
 
   function formatNumber(num) {
     if (num === null || num === undefined) return '0';
@@ -24,34 +23,27 @@
 
   async function cargarDatos() {
     try {
-      // Cargar datos geográficos
       const { data: geoData, error: geoError } = await supabaseMapa
         .from('secciones_geo_slp')
         .select('feature, seccion, distrito_f, distrito_l');
 
       if (geoError) throw geoError;
 
-      // Cargar resultados electorales - usar nombres exactos de columnas según esquema
       const { data: resultados, error: resultadosError } = await supabaseMapa
         .from('resultados_dip_locales_slp')
         .select('seccion, "Municipio", "PAN", "PRI", "PRD", "PVEM", "PT", "MORENA", votos_emitidos, abstencion');
 
       if (resultadosError) throw resultadosError;
 
-
-      // Función para normalizar número de sección
        function normalizarSeccion(sec) {
          if (sec === null || sec === undefined) return null;
-         // Convertir a número y luego a string para eliminar ceros a la izquierda
          const num = Number(sec);
          if (isNaN(num)) return String(sec).trim();
          return String(num);
        }
 
-        // Función para obtener valor de columna ignorando mayúsculas/minúsculas
         function getValue(row, columnName) {
           if (row[columnName] !== undefined) return row[columnName];
-          // Buscar coincidencia insensible a mayúsculas
           const lowerColumn = columnName.toLowerCase();
           for (const key in row) {
             if (key.toLowerCase() === lowerColumn) return row[key];
@@ -59,7 +51,6 @@
           return undefined;
         }
 
-       // Agrupar resultados por sección (sumar votos)
        const resultadosPorSeccion = {};
         resultados.forEach(row => {
           const seccion = normalizarSeccion(getValue(row, 'seccion'));
@@ -91,35 +82,10 @@
           target.abstencion += getValue(row, 'abstencion') || 0;
         });
         
-        
-        
-        // Debug: verificar coincidencias de sección
         const geoSecciones = new Set(geoData.map(g => normalizarSeccion(g.seccion)).filter(Boolean));
         const resultadosSecciones = new Set(Object.keys(resultadosPorSeccion));
         const coinciden = [...geoSecciones].filter(sec => resultadosSecciones.has(sec));
 
-        // Calcular quintiles de votos totales (votos_emitidos + abstencion)
-        const votosTotalesPorSeccion = Object.values(resultadosPorSeccion).map(r => (r.votos_emitidos || 0) + (r.abstencion || 0));
-        votosTotalesPorSeccion.sort((a, b) => a - b);
-        const quintiles = [];
-        const numQuintiles = 5;
-        if (votosTotalesPorSeccion.length > 0) {
-          const segmentSize = Math.ceil(votosTotalesPorSeccion.length / numQuintiles);
-          for (let i = 0; i < numQuintiles; i++) {
-            const startIdx = i * segmentSize;
-            const endIdx = Math.min(startIdx + segmentSize, votosTotalesPorSeccion.length) - 1;
-            const min = votosTotalesPorSeccion[startIdx];
-            const max = votosTotalesPorSeccion[endIdx];
-            const label = `${i === 0 ? 'Muy bajo' : i === 1 ? 'Bajo' : i === 2 ? 'Medio' : i === 3 ? 'Alto' : 'Muy alto'} (${formatNumber(min)} - ${formatNumber(max)})`;
-            quintiles.push({ min, max, label });
-          }
-        } else {
-          // Si no hay datos, crear un rango vacío
-          quintiles.push({ min: 0, max: 0, label: 'Sin datos' });
-        }
-        rangosVotosTotales = quintiles;
-
-        // Combinar datos geográficos con resultados
        allData = geoData.map(geoRow => {
          const seccion = normalizarSeccion(geoRow.seccion);
          const resultadosSeccion = resultadosPorSeccion[seccion] || null;
@@ -128,13 +94,10 @@
            resultados: resultadosSeccion
          };
        });
-       
 
-      // Extraer distritos para filtro
       const distritos = [...new Set(geoData.map(row => row.distrito_l).filter(Boolean))].sort();
       distritosL = distritos;
 
-      // Extraer municipios para filtro
       const municipiosUnicos = [...new Set(Object.values(resultadosPorSeccion)
         .map(r => r.municipio)
         .filter(Boolean))].sort();
@@ -142,6 +105,7 @@
 
         resultadosData = Object.values(resultadosPorSeccion);
         
+        calcularMaxVotos();
         
         loading = false;
     } catch (e) {
@@ -151,40 +115,32 @@
     }
   }
 
+  function calcularMaxVotos() {
+    let max = 0;
+    for (let i = 0; i < allData.length; i++) {
+      const v = allData[i].resultados?.votos_emitidos || 0;
+      if (v > max) max = v;
+    }
+    maxVotosCache = max;
+  }
+
   function getColorByVotes(votos) {
-    if (!votos || votos === 0) return '#f0f0f0'; // gris claro para sin datos
+    if (!votos || votos === 0) return '#f0f0f0';
     
-    // Encontrar rango de votos para normalizar
-    const votosValues = allData
-      .map(d => d.resultados?.votos_emitidos || 0)
-      .filter(v => v > 0);
+    if (maxVotosCache === 0) return '#f0f0f0';
     
-    if (votosValues.length === 0) return '#f0f0f0';
-    
-    const maxVotos = Math.max(...votosValues);
-    if (maxVotos === 0) return '#f0f0f0';
-    
-    // Normalizar entre 0.3 y 0.9 (invertido: más votos = más oscuro)
-    const normalized = Math.min(votos / maxVotos, 1);
-    const lightness = 90 - (normalized * 60); // de 90% a 30%
+    const normalized = Math.min(votos / maxVotosCache, 1);
+    const lightness = 90 - (normalized * 60);
     
     return `hsl(0, 70%, ${lightness}%)`;
   }
-
-
 
   function obtenerDatosFiltrados() {
     return allData.filter(row => {
       const cumpleDistrito = !distritoSeleccionado || row.distrito_l === distritoSeleccionado;
       const cumpleMunicipio = !municipioSeleccionado || 
         (row.resultados && row.resultados.municipio === municipioSeleccionado);
-      const cumpleRango = !rangoSeleccionado || (() => {
-        const rango = rangosVotosTotales.find(r => r.label === rangoSeleccionado);
-        if (!rango) return true;
-        const votosTotales = row.resultados ? (row.resultados.votos_emitidos || 0) + (row.resultados.abstencion || 0) : 0;
-        return votosTotales >= rango.min && votosTotales <= rango.max;
-      })();
-      return cumpleDistrito && cumpleMunicipio && cumpleRango;
+      return cumpleDistrito && cumpleMunicipio;
     });
   }
 
@@ -242,7 +198,6 @@
 
     const L = window.L;
 
-    // Aplicar filtros combinados
     const datosFiltrados = obtenerDatosFiltrados();
 
     datosFiltrados.forEach(row => {
@@ -257,7 +212,6 @@
           const distritoL = row.distrito_l ?? geojson.properties?.DISTRITO_L ?? 'N/A';
           const resultados = row.resultados;
           
-          // Calcular votos totales (usar votos_emitidos si disponible, sino sumar partidos)
           let votosTotales = 0;
           if (resultados) {
             votosTotales = resultados.votos_emitidos || 
@@ -265,47 +219,45 @@
                resultados.PVEM + resultados.PT + resultados.MORENA);
           }
           
-          // Obtener color basado en votos totales
           const fillColor = getColorByVotes(votosTotales);
 
           const layer = L.geoJSON(geojson, {
             style: {
-              color: '#0366d6',
+              color: '#6B1D2A',
               weight: 1,
-              opacity: 0.8,
+              opacity: 0.6,
               fillColor: fillColor,
-              fillOpacity: 0.6
+              fillOpacity: 0.7
             }
           });
 
           layer.on('mouseover', function () {
-            this.setStyle({ fillOpacity: 0.8, weight: 2 });
+            this.setStyle({ fillOpacity: 0.9, weight: 2, color: '#C9A84C' });
           });
 
           layer.on('mouseout', function () {
-            this.setStyle({ fillOpacity: 0.6, weight: 1 });
+            this.setStyle({ fillOpacity: 0.7, weight: 1, color: '#6B1D2A' });
           });
 
-          // Construir contenido del popup con datos de votación
-          let popupContent = `<b>Sección:</b> ${seccion}<br>`;
+          let popupContent = `<b>Seccion:</b> ${seccion}<br>`;
           popupContent += `<b>Distrito Federal:</b> ${distritoF}<br>`;
           popupContent += `<b>Distrito Local:</b> ${distritoL}<br>`;
           
           if (resultados) {
             popupContent += `<b>Municipio:</b> ${resultados.municipio || 'N/A'}<br>`;
-            popupContent += `<hr style="margin: 8px 0; border-color: #e1e4e8;">`;
+            popupContent += `<hr style="margin: 8px 0; border-color: #e5e7eb;">`;
             popupContent += `<b>Votos Totales:</b> ${formatNumber(votosTotales)}<br>`;
             popupContent += `<b>Abstenciones:</b> ${formatNumber(resultados.abstencion)}<br>`;
-            popupContent += `<hr style="margin: 8px 0; border-color: #e1e4e8;">`;
+            popupContent += `<hr style="margin: 8px 0; border-color: #e5e7eb;">`;
             popupContent += `<b>Votos por Partido:</b><br>`;
-            popupContent += `• MORENA: ${formatNumber(resultados.MORENA)}<br>`;
-            popupContent += `• PAN: ${formatNumber(resultados.PAN)}<br>`;
-            popupContent += `• PRI: ${formatNumber(resultados.PRI)}<br>`;
-            popupContent += `• PVEM: ${formatNumber(resultados.PVEM)}<br>`;
-            popupContent += `• PT: ${formatNumber(resultados.PT)}<br>`;
-            popupContent += `• PRD: ${formatNumber(resultados.PRD)}<br>`;
+            popupContent += `<span style="color:#8B4513;">&bull;</span> MORENA: ${formatNumber(resultados.MORENA)}<br>`;
+            popupContent += `<span style="color:#0420a4;">&bull;</span> PAN: ${formatNumber(resultados.PAN)}<br>`;
+            popupContent += `<span style="color:#00843D;">&bull;</span> PRI: ${formatNumber(resultados.PRI)}<br>`;
+            popupContent += `<span style="color:#00A650;">&bull;</span> PVEM: ${formatNumber(resultados.PVEM)}<br>`;
+            popupContent += `<span style="color:#C41E24;">&bull;</span> PT: ${formatNumber(resultados.PT)}<br>`;
+            popupContent += `<span style="color:#FFD100;">&bull;</span> PRD: ${formatNumber(resultados.PRD)}<br>`;
           } else {
-            popupContent += `<br><i>No hay datos de votación para esta sección</i>`;
+            popupContent += `<br><i>No hay datos de votacion para esta seccion</i>`;
           }
 
           layer.bindPopup(popupContent);
@@ -335,15 +287,9 @@
     dibujarPoligonos();
   }
 
-  function limpiarFiltroRango() {
-    rangoSeleccionado = '';
-    dibujarPoligonos();
-  }
-
   function limpiarTodosFiltros() {
     distritoSeleccionado = '';
     municipioSeleccionado = '';
-    rangoSeleccionado = '';
     dibujarPoligonos();
   }
 
@@ -376,12 +322,18 @@
 
 <div class="map-page">
   <header class="map-header">
-    <h1>Mapa de Secciones Electorales - Diputación SLP</h1>
+    <div class="header-content">
+      <h1>Mapa de Secciones Electorales</h1>
+      <p class="header-subtitle">Diputacion Local - San Luis Potosi</p>
+    </div>
+  </header>
+
+  <section class="card filter-bar">
     <div class="filter-controls">
       <div class="filter-group">
         <label for="distrito-l">Distrito Local</label>
         <div class="select-wrapper">
-          <select id="distrito-l" bind:value={distritoSeleccionado} on:change={aplicarFiltro} class="select-input">
+          <select id="distrito-l" bind:value={distritoSeleccionado} on:change={aplicarFiltro} class="input">
             <option value="">Todos</option>
             {#each distritosL as distrito}
               <option value={distrito}>{distrito}</option>
@@ -389,7 +341,9 @@
           </select>
           {#if distritoSeleccionado}
             <button on:click={limpiarFiltroDistrito} class="btn-clear-small" title="Limpiar filtro" type="button">
-              ✕
+              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <path d="M3 3l8 8M11 3l-8 8"/>
+              </svg>
             </button>
           {/if}
         </div>
@@ -398,7 +352,7 @@
       <div class="filter-group">
         <label for="municipio">Municipio</label>
         <div class="select-wrapper">
-          <select id="municipio" bind:value={municipioSeleccionado} on:change={aplicarFiltro} class="select-input">
+          <select id="municipio" bind:value={municipioSeleccionado} on:change={aplicarFiltro} class="input">
             <option value="">Todos</option>
             {#each municipios as municipio}
               <option value={municipio}>{municipio}</option>
@@ -406,79 +360,71 @@
           </select>
           {#if municipioSeleccionado}
             <button on:click={limpiarFiltroMunicipio} class="btn-clear-small" title="Limpiar filtro" type="button">
-              ✕
+              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <path d="M3 3l8 8M11 3l-8 8"/>
+              </svg>
             </button>
           {/if}
         </div>
       </div>
       
-      <div class="filter-group">
-        <label for="rango-votos">Votos Totales</label>
-        <div class="select-wrapper">
-          <select id="rango-votos" bind:value={rangoSeleccionado} on:change={aplicarFiltro} class="select-input">
-            <option value="">Todos</option>
-            {#each rangosVotosTotales as rango}
-              <option value={rango.label}>{rango.label}</option>
-            {/each}
-          </select>
-          {#if rangoSeleccionado}
-            <button on:click={limpiarFiltroRango} class="btn-clear-small" title="Limpiar filtro" type="button">
-              ✕
-            </button>
-          {/if}
-        </div>
-      </div>
-      
-      <div class="filter-buttons">
-        <button on:click={aplicarFiltro} class="btn-apply">Filtrar</button>
-        <button on:click={limpiarTodosFiltros} class="btn-clear">Limpiar Todo</button>
+      <div class="filter-actions">
+        <button on:click={aplicarFiltro} class="btn btn-primary">Filtrar</button>
+        <button on:click={limpiarTodosFiltros} class="btn btn-secondary">Limpiar</button>
       </div>
     </div>
-  </header>
+  </section>
 
   {#if loading}
     <div class="loading">Cargando secciones electorales...</div>
   {:else if error}
-    <div class="error">Error: {error}</div>
+    <div class="error">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="error-icon">
+        <circle cx="10" cy="10" r="9"/><path d="M10 6v4"/><path d="M10 14h0"/>
+      </svg>
+      <span>Error: {error}</span>
+    </div>
   {/if}
 
-
-
-  <!-- Totales y votos por partido -->
-  <section class="party-cards-section">
-    <h2>Resultados Electorales</h2>
-    <div class="cards">
-      <div class="card">
-        <h3>Votos Totales</h3>
-        <p class="number">{formatNumber(votosPorPartido.total)}</p>
+  <section class="results-section">
+    <h2 class="section-title">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="section-icon">
+        <path d="M2 10l4-4 4 4 4-4 4 4"/><path d="M2 14l4-4 4 4 4-4 4 4"/>
+      </svg>
+      Resultados Electorales
+    </h2>
+    <div class="results-cards">
+      <div class="result-card result-card--total">
+        <span class="result-card-label">Votos Totales</span>
+        <span class="result-card-value">{formatNumber(votosPorPartido.total)}</span>
       </div>
-      <div class="card">
-        <h3>Abstenciones</h3>
-        <p class="number">{formatNumber(votosPorPartido.abstencion)}</p>
+      <div class="result-card result-card--abstencion">
+        <span class="result-card-label">Abstenciones</span>
+        <span class="result-card-value">{formatNumber(votosPorPartido.abstencion)}</span>
       </div>
-      <div class="card">
-        <h3>MORENA</h3>
-        <p class="number">{formatNumber(votosPorPartido.MORENA)}</p>
+      <div class="result-card result-card--morena">
+        <span class="result-card-label">MORENA</span>
+        <span class="result-card-value">{formatNumber(votosPorPartido.MORENA)}</span>
       </div>
-      <div class="card">
-        <h3>PAN</h3>
-        <p class="number">{formatNumber(votosPorPartido.PAN)}</p>
+      <div class="result-card result-card--pan">
+        <span class="result-card-label">PAN</span>
+        <span class="result-card-value">{formatNumber(votosPorPartido.PAN)}</span>
       </div>
-      <div class="card">
-        <h3>PRI</h3>
-        <p class="number">{formatNumber(votosPorPartido.PRI)}</p>
+      <div class="result-card result-card--pri">
+        <span class="result-card-label">PRI</span>
+        <span class="result-card-value">{formatNumber(votosPorPartido.PRI)}</span>
       </div>
-      <div class="card">
-        <h3>PVEM</h3>
-        <p class="number">{formatNumber(votosPorPartido.PVEM)}</p>
+      <div class="result-card result-card--pvem">
+        <span class="result-card-label">PVEM</span>
+        <span class="result-card-value">{formatNumber(votosPorPartido.PVEM)}</span>
       </div>
-      <div class="card">
-        <h3>PT</h3>
-        <p class="number">{formatNumber(votosPorPartido.PT)}</p>
+      <div class="result-card result-card--pt">
+        <span class="result-card-label">PT</span>
+        <span class="result-card-value">{formatNumber(votosPorPartido.PT)}</span>
       </div>
-      <div class="card">
-        <h3>PRD</h3>
-        <p class="number">{formatNumber(votosPorPartido.PRD)}</p>
+      <div class="result-card result-card--prd">
+        <span class="result-card-label">PRD</span>
+        <span class="result-card-value">{formatNumber(votosPorPartido.PRD)}</span>
       </div>
     </div>
   </section>
@@ -497,33 +443,43 @@
     </div>
   </div>
 
-  <!-- Tarjetas de afiliados por partido -->
-  <section class="party-cards-section">
-    <h2>Afiliados por partido</h2>
-    <div class="cards">
-      <div class="card">
-        <h3>MORENA</h3>
-        <p class="number">224,282</p>
+  <section class="results-section">
+    <h2 class="section-title">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="section-icon">
+        <path d="M17 21v-2a4 4 0 00-4-4H7a4 4 0 00-4 4v2"/><circle cx="10" cy="7" r="4"/>
+      </svg>
+      Afiliados por Partido
+    </h2>
+    <div class="affiliation-cards">
+      <div class="aff-card aff-card--morena">
+        <div class="aff-card-bar"></div>
+        <span class="aff-card-label">MORENA</span>
+        <span class="aff-card-value">224,282</span>
       </div>
-      <div class="card">
-        <h3>PVEM</h3>
-        <p class="number">200,224</p>
+      <div class="aff-card aff-card--pvem">
+        <div class="aff-card-bar"></div>
+        <span class="aff-card-label">PVEM</span>
+        <span class="aff-card-value">200,224</span>
       </div>
-      <div class="card">
-        <h3>MC</h3>
-        <p class="number">8,621</p>
+      <div class="aff-card aff-card--mc">
+        <div class="aff-card-bar"></div>
+        <span class="aff-card-label">MC</span>
+        <span class="aff-card-value">8,621</span>
       </div>
-      <div class="card">
-        <h3>PT</h3>
-        <p class="number">7,573</p>
+      <div class="aff-card aff-card--pt">
+        <div class="aff-card-bar"></div>
+        <span class="aff-card-label">PT</span>
+        <span class="aff-card-value">7,573</span>
       </div>
-      <div class="card">
-        <h3>PAN</h3>
-        <p class="number">7,174</p>
+      <div class="aff-card aff-card--pan">
+        <div class="aff-card-bar"></div>
+        <span class="aff-card-label">PAN</span>
+        <span class="aff-card-value">7,174</span>
       </div>
-      <div class="card">
-        <h3>PRI</h3>
-        <p class="number">1,920</p>
+      <div class="aff-card aff-card--pri">
+        <div class="aff-card-bar"></div>
+        <span class="aff-card-label">PRI</span>
+        <span class="aff-card-value">1,920</span>
       </div>
     </div>
   </section>
@@ -535,33 +491,65 @@
       width: 100%;
       height: 100%;
     }
+    .leaflet-popup-content-wrapper {
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .leaflet-popup-content {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      line-height: 1.6;
+      margin: 12px 16px;
+    }
   }
 
-   .map-page {
-     max-width: 1600px;
-     margin: 0 auto;
-     padding: 30px;
-     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-   }
+  .map-page {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 30px;
+  }
+
+  .card {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+  }
 
   .map-header {
-    background: white;
-    padding: 20px 30px;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 20px;
+    padding: 24px 30px;
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    border-left: 4px solid var(--color-accent);
   }
 
-  .map-header h1 {
-    margin: 0 0 15px 0;
-    color: #24292e;
+  .header-content h1 {
+    margin: 0;
     font-size: 24px;
+    color: var(--color-primary);
+    letter-spacing: -0.3px;
+  }
+
+  .header-subtitle {
+    margin: 4px 0 0;
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-body);
+  }
+
+  .filter-bar {
+    padding: 16px 20px;
+    margin-bottom: 20px;
   }
 
   .filter-controls {
     display: flex;
     align-items: flex-end;
-    gap: 15px;
+    gap: 16px;
     flex-wrap: wrap;
   }
 
@@ -572,49 +560,36 @@
   }
 
   .filter-group label {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
-    color: #586069;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
 
-  .filter-group select {
-    padding: 8px 12px;
-    border: 1px solid #d1d5da;
-    border-radius: 6px;
-    font-size: 14px;
-    font-family: inherit;
-    background: white;
-    cursor: pointer;
-    min-width: 180px;
-  }
-
-  .filter-group select:focus {
-    outline: none;
-    border-color: #0366d6;
-    box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.15);
-  }
-
-  .select-input {
+  .input {
     padding: 10px 12px;
-    border: 1px solid #d1d5da;
-    border-radius: 6px;
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-md);
     font-size: 14px;
-    font-family: inherit;
+    font-family: var(--font-body);
+    background: var(--color-surface);
     cursor: pointer;
-    background: white;
+    min-width: 200px;
     width: 100%;
     box-sizing: border-box;
     transition: border-color 0.2s, box-shadow 0.2s;
+    color: var(--color-text);
   }
 
-  .select-input:hover {
-    border-color: #0366d6;
+  .input:hover {
+    border-color: var(--color-primary-light);
   }
 
-  .select-input:focus {
+  .input:focus {
     outline: none;
-    border-color: #0366d6;
-    box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.15);
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.15);
   }
 
   .select-wrapper {
@@ -629,71 +604,79 @@
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
   }
 
   .btn-clear-small {
     position: absolute;
     right: 8px;
-    background: #e1e4e8;
-    color: #586069;
+    background: var(--color-border);
+    color: var(--color-text-secondary);
     border: none;
     width: 22px;
     height: 22px;
     padding: 0;
-    font-size: 11px;
     cursor: pointer;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    transition: background 0.2s, color 0.2s;
+    transition: all 0.2s;
   }
 
   .btn-clear-small:hover {
-    background: #c5221f;
+    background: var(--color-error);
     color: white;
   }
 
-  .filter-buttons {
+  .btn-clear-small svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .filter-actions {
     display: flex;
     gap: 8px;
   }
 
-  button {
-    padding: 8px 16px;
+  .btn {
+    padding: 8px 18px;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     cursor: pointer;
     font-size: 13px;
     font-weight: 500;
-    transition: background 0.2s;
+    font-family: var(--font-body);
+    transition: all 0.2s;
   }
 
-  .btn-apply {
-    background: #28a745;
-    color: white;
+  .btn-primary {
+    background: var(--color-accent);
+    color: var(--color-primary-dark);
   }
 
-  .btn-apply:hover {
-    background: #218838;
+  .btn-primary:hover {
+    background: var(--color-accent-light);
   }
 
-  .btn-clear {
-    background: #6c757d;
-    color: white;
+  .btn-secondary {
+    background: var(--color-border);
+    color: var(--color-text-secondary);
   }
 
-  .btn-clear:hover {
-    background: #5a6268;
+  .btn-secondary:hover {
+    background: #d1d5db;
   }
 
   .map-wrapper {
     position: relative;
     height: calc(100vh - 420px);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: var(--shadow-lg);
   }
 
   .map-container {
@@ -705,20 +688,21 @@
     position: absolute;
     bottom: 20px;
     right: 20px;
-    background: white;
-    padding: 12px 16px;
-    border-radius: 6px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    background: var(--color-surface);
+    padding: 14px 18px;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
     font-size: 12px;
     z-index: 1000;
     min-width: 160px;
   }
 
   .map-legend h4 {
-    margin: 0 0 8px 0;
-    color: #24292e;
+    margin: 0 0 8px;
+    color: var(--color-primary);
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 700;
+    font-family: var(--font-heading);
   }
 
   .legend-gradient {
@@ -731,7 +715,7 @@
     display: flex;
     justify-content: space-between;
     font-size: 11px;
-    color: #586069;
+    color: var(--color-text-secondary);
   }
 
   .gradient-bar {
@@ -744,68 +728,96 @@
   .loading {
     text-align: center;
     padding: 20px;
-    background: white;
-    border-radius: 8px;
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
     margin-bottom: 20px;
-    color: #586069;
+    color: var(--color-text-secondary);
+    box-shadow: var(--shadow-sm);
   }
 
   .error {
-    background: #ffeef0;
-    border: 1px solid #fdaeb7;
-    color: #c5221f;
-    padding: 15px;
-    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--color-error-bg);
+    border: 1px solid var(--color-error-border);
+    color: var(--color-error);
+    padding: 14px 18px;
+    border-radius: var(--radius-md);
     margin-bottom: 20px;
+    font-size: 14px;
   }
 
-  /* Sección de tarjetas de afiliados por partido */
-  .party-cards-section {
-    margin-top: 30px;
-    background: white;
-    border-radius: 8px;
-    padding: 25px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  .error-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
   }
 
-  .party-cards-section h2 {
-    margin: 0 0 20px 0;
-    color: #24292e;
-    font-size: 20px;
-    font-weight: 600;
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 20px;
+    font-size: 18px;
+    color: var(--color-primary);
+    font-weight: 700;
+  }
+
+  .section-icon {
+    width: 18px;
+    height: 18px;
+    color: var(--color-accent);
+    flex-shrink: 0;
+  }
+
+  .results-section {
+    margin: 24px 0;
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    box-shadow: var(--shadow-md);
+  }
+
+  .results-cards {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 12px;
+  }
+
+  .result-card {
+    background: var(--color-bg);
+    border-radius: var(--radius-md);
+    padding: 16px 12px;
     text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border-top: 3px solid var(--color-border);
+    transition: transform 0.2s;
   }
 
-   .cards {
-     display: grid;
-     grid-template-columns: repeat(8, 1fr);
-     gap: 15px;
-   }
-
-   .party-cards-section:last-of-type .cards {
-     grid-template-columns: repeat(6, 1fr);
-   }
-
-  .card {
-    background: white;
-    border: 1px solid #e1e4e8;
-    border-radius: 8px;
-    padding: 20px 15px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    transition: transform 0.2s, box-shadow 0.2s;
-    text-align: center;
-  }
-
-  .card:hover {
+  .result-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
   }
 
-  .card h3 {
-    margin: 0 0 8px 0;
-    color: #586069;
-    font-size: 13px;
-    font-weight: 500;
+  .result-card--total { border-top-color: var(--color-primary); }
+  .result-card--abstencion { border-top-color: var(--color-text-muted); }
+  .result-card--morena { border-top-color: #6B1D2A; }
+  .result-card--pan { border-top-color: #0420a4; }
+  .result-card--pri { border-top-color: #00843D; }
+  .result-card--pvem { border-top-color: #00A650; }
+  .result-card--pt { border-top-color: #C41E24; }
+  .result-card--prd { border-top-color: #FFD100; }
+
+  .result-card--prd .result-card-value {
+    color: #8B6F00;
+  }
+
+  .result-card-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     white-space: nowrap;
@@ -813,43 +825,127 @@
     text-overflow: ellipsis;
   }
 
-  .card .number {
-    margin: 0;
-    font-size: 28px;
-    font-weight: 700;
-    color: #24292e;
+  .result-card-value {
+    font-family: var(--font-heading);
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--color-primary);
+    line-height: 1.1;
   }
 
+  .affiliation-cards {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 16px;
+  }
 
+  .aff-card {
+    background: var(--color-bg);
+    border-radius: var(--radius-md);
+    padding: 20px 16px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s;
+  }
 
-   /* Responsive */
-   @media (max-width: 1024px) {
-     .cards {
-       grid-template-columns: repeat(4, 1fr);
-     }
-     .party-cards-section:last-of-type .cards {
-       grid-template-columns: repeat(3, 1fr);
-     }
-     .map-wrapper {
-       height: calc(100vh - 450px);
-     }
-   }
+  .aff-card:hover {
+    transform: translateY(-2px);
+  }
 
-   @media (max-width: 640px) {
-     .cards {
-       grid-template-columns: repeat(2, 1fr);
-     }
-     .party-cards-section:last-of-type .cards {
-       grid-template-columns: repeat(2, 1fr);
-     }
-     .map-wrapper {
-       height: calc(100vh - 550px);
-     }
-     .map-legend {
-       bottom: 10px;
-       right: 10px;
-       padding: 10px;
-       min-width: 140px;
-     }
-   }
+  .aff-card-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+  }
+
+  .aff-card--morena .aff-card-bar { background: #6B1D2A; }
+  .aff-card--pvem .aff-card-bar { background: #00A650; }
+  .aff-card--mc .aff-card-bar { background: #FF6B00; }
+  .aff-card--pt .aff-card-bar { background: #C41E24; }
+  .aff-card--pan .aff-card-bar { background: #0420a4; }
+  .aff-card--pri .aff-card-bar { background: #00843D; }
+
+  .aff-card-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .aff-card-value {
+    font-family: var(--font-heading);
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--color-primary);
+  }
+
+  @media (max-width: 1200px) {
+    .results-cards {
+      grid-template-columns: repeat(4, 1fr);
+    }
+    .affiliation-cards {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  @media (max-width: 1024px) {
+    .map-wrapper {
+      height: calc(100vh - 480px);
+    }
+    .filter-controls {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .filter-group .input {
+      min-width: 0;
+    }
+    .filter-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .filter-actions button {
+      flex: 1;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .map-page {
+      padding: 16px;
+    }
+    .map-header {
+      padding: 20px;
+    }
+    .header-content h1 {
+      font-size: 20px;
+    }
+    .results-cards {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .affiliation-cards {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .map-wrapper {
+      height: calc(100vh - 580px);
+    }
+    .map-legend {
+      bottom: 10px;
+      right: 10px;
+      padding: 10px;
+      min-width: 140px;
+    }
+    .result-card-value {
+      font-size: 18px;
+    }
+    .aff-card-value {
+      font-size: 22px;
+    }
+  }
 </style>

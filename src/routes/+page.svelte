@@ -32,15 +32,10 @@
     Legend
   );
 
-  // 📅 Estado para los filtros de fecha
   let fechaInicio = '';
   let fechaFin = '';
-  
-  // 👤📰 Estado para filtros de persona y medio
   let personaSeleccionada = '';
   let medioSeleccionado = '';
-  
-  // 📰 Lista de medios disponibles (se carga dinámicamente)
   let mediosDisponibles = [];
 
   const chartOptions = {
@@ -69,19 +64,18 @@
   };
 
   const colors = {
-    blue: 'rgba(54, 162, 235, 0.8)',
-    green: 'rgba(75, 192, 192, 0.8)',
-    red: 'rgba(255, 99, 132, 0.8)',
-    yellow: 'rgba(255, 206, 86, 0.8)',
-    purple: 'rgba(153, 102, 255, 0.8)',
-    orange: 'rgba(255, 159, 64, 0.8)',
-    gray: 'rgba(201, 203, 207, 0.8)'
+    primary: '#6B1D2A',
+    accent: '#C9A84C',
+    slate: '#6B7280',
+    teal: '#0D9488',
+    rose: '#BE185D',
+    amber: '#D97706',
+    emerald: '#059669',
+    gray: '#9CA3AF'
   };
 
   onMount(async () => {
-    // Cargar lista de medios disponibles
     mediosDisponibles = await obtenerMediosUnicos();
-    // Cargar datos iniciales
     cargarDatos();
   });
 
@@ -94,7 +88,6 @@
     });
   }
 
-  // 📅 Funciones de filtro rápido
   function filtrarHoy() {
     const hoy = new Date().toISOString().split('T')[0];
     fechaInicio = hoy;
@@ -128,7 +121,6 @@
     cargarDatos();
   }
 
-  // 🔍 Aplicar todos los filtros
   function aplicarFiltro() {
     cargarDatos({
       fechaInicio: fechaInicio || null,
@@ -138,7 +130,6 @@
     });
   }
 
-  // 🧹 Limpiar todos los filtros
   function limpiarFiltros() {
     fechaInicio = '';
     fechaFin = '';
@@ -147,91 +138,90 @@
     cargarDatos();
   }
 
-  // 👤 Limpiar solo filtro de persona
   function limpiarPersona() {
     personaSeleccionada = '';
     aplicarFiltro();
   }
 
-  // 📰 Limpiar solo filtro de medio
   function limpiarMedio() {
     medioSeleccionado = '';
     aplicarFiltro();
   }
 
-  // ✅ Verificar si hay filtros activos
   $: hayFiltrosActivos = fechaInicio || fechaFin || personaSeleccionada || medioSeleccionado;
 </script>
 
 <div class="dashboard">
-  <header>
-    <div class="header-left">
-      <h1>📊 Dashboard de Análisis de Noticias</h1>
+  <header class="page-header">
+    <div class="header-content">
+      <h1>Dashboard de Analisis de Noticias</h1>
+      <p class="header-subtitle">Monitoreo de cobertura mediatica y analisis de sentimiento</p>
     </div>
-    <div class="header-right">
-      <button on:click={recargar} disabled={$loading}>
-        {$loading ? 'Cargando...' : '🔄 Actualizar'}
-      </button>
-    </div>
+    <button on:click={recargar} disabled={$loading} class="btn-reload">
+      {#if $loading}
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="spinner-icon">
+          <path d="M10 2v4M10 14v4M4.93 4.93l2.83 2.83M12.24 12.24l2.83 2.83M2 10h4M14 10h4M4.93 15.07l2.83-2.83M12.24 7.76l2.83-2.83"/>
+        </svg>
+        Cargando...
+      {:else}
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon">
+          <path d="M14.5 4.5A7 7 0 014 12.5M5.5 15.5A7 7 0 0016 7.5"/>
+          <path d="M14.5 1v3.5H11M5.5 19v-3.5H9"/>
+        </svg>
+        Actualizar
+      {/if}
+    </button>
   </header>
 
   {#if $error}
     <div class="error">
-      <p>⚠️ Error: {$error}</p>
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="error-icon">
+        <circle cx="10" cy="10" r="9"/><path d="M10 6v4"/><path d="M10 14h0"/>
+      </svg>
+      <span>{$error}</span>
     </div>
   {/if}
 
   {#if $loading}
     <div class="loading">
-      <p>⏳ Cargando datos...</p>
+      <div class="spinner-large"></div>
+      <p>Cargando datos...</p>
     </div>
   {:else}
-    <!-- 🔍 Filtros -->
-    <section class="filters-section">
+    <section class="card filters-card">
       <div class="filters-header">
-        <h3 class="filters-title">🔍 Filtros de Búsqueda</h3>
+        <h2 class="section-title">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="section-icon">
+            <path d="M2 4h16M6 10h8M9 16h2"/>
+            <circle cx="4" cy="4" r="1.5" fill="currentColor"/>
+            <circle cx="16" cy="10" r="1.5" fill="currentColor"/>
+            <circle cx="10" cy="16" r="1.5" fill="currentColor"/>
+          </svg>
+          Filtros de Busqueda
+        </h2>
         <div class="filters-actions">
-          <button on:click={aplicarFiltro} class="btn-apply">
-            🔍 Aplicar
+          <button on:click={aplicarFiltro} class="btn btn-primary">
+            Aplicar Filtros
           </button>
-          <button on:click={limpiarFiltros} class="btn-clear" disabled={!hayFiltrosActivos}>
-            🧹 Limpiar
+          <button on:click={limpiarFiltros} class="btn btn-secondary" disabled={!hayFiltrosActivos}>
+            Limpiar
           </button>
         </div>
       </div>
       
       <div class="filters-grid">
-        <!-- Fecha Inicio -->
-        <div class="filters-group">
-          <label for="fecha-inicio">📅 Fecha Inicio</label>
-          <input 
-            id="fecha-inicio"
-            type="date" 
-            bind:value={fechaInicio} 
-            class="date-input"
-          />
+        <div class="filter-group">
+          <label for="fecha-inicio">Fecha Inicio</label>
+          <input id="fecha-inicio" type="date" bind:value={fechaInicio} class="input" />
         </div>
-        
-        <!-- Fecha Fin -->
-        <div class="filters-group">
-          <label for="fecha-fin">📅 Fecha Fin</label>
-          <input 
-            id="fecha-fin"
-            type="date" 
-            bind:value={fechaFin} 
-            class="date-input"
-          />
+        <div class="filter-group">
+          <label for="fecha-fin">Fecha Fin</label>
+          <input id="fecha-fin" type="date" bind:value={fechaFin} class="input" />
         </div>
-
-        <!-- Filtro por Persona -->
-        <div class="filters-group">
-          <label for="persona-select">👤 Persona</label>
+        <div class="filter-group">
+          <label for="persona-select">Persona</label>
           <div class="select-wrapper">
-            <select 
-              id="persona-select"
-              bind:value={personaSeleccionada} 
-              class="select-input"
-            >
+            <select id="persona-select" bind:value={personaSeleccionada} class="input">
               <option value="">Todas las personas</option>
               {#each personasDisponibles as persona}
                 <option value={persona}>{persona}</option>
@@ -239,21 +229,17 @@
             </select>
             {#if personaSeleccionada}
               <button on:click={limpiarPersona} class="btn-clear-small" title="Limpiar filtro" type="button">
-                ✕
+                <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M3 3l8 8M11 3l-8 8"/>
+                </svg>
               </button>
             {/if}
           </div>
         </div>
-
-        <!-- Filtro por Medio -->
-        <div class="filters-group">
-          <label for="medio-select">📰 Medio</label>
+        <div class="filter-group">
+          <label for="medio-select">Medio</label>
           <div class="select-wrapper">
-            <select 
-              id="medio-select"
-              bind:value={medioSeleccionado} 
-              class="select-input"
-            >
+            <select id="medio-select" bind:value={medioSeleccionado} class="input">
               <option value="">Todos los medios</option>
               {#each mediosDisponibles as medio}
                 <option value={medio}>{medio}</option>
@@ -261,41 +247,61 @@
             </select>
             {#if medioSeleccionado}
               <button on:click={limpiarMedio} class="btn-clear-small" title="Limpiar filtro" type="button">
-                ✕
+                <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M3 3l8 8M11 3l-8 8"/>
+                </svg>
               </button>
             {/if}
           </div>
         </div>
       </div>
-    </section>
 
-    <!-- ⚡ Filtros Rápidos -->
-    <section class="quick-filters">
-      <span class="quick-filters-label">Filtros rápidos:</span>
-      <button on:click={filtrarHoy} class="btn-quick">Hoy</button>
-      <button on:click={filtrarUltimos7Dias} class="btn-quick">Últimos 7 días</button>
-      <button on:click={filtrarUltimos30Dias} class="btn-quick">Últimos 30 días</button>
-      <button on:click={filtrarTodo} class="btn-quick">Todo el historial</button>
-    </section>
-
-    <!-- Tarjetas de Resumen (SOLO 2) -->
-    <section class="cards">
-      <div class="card">
-        <h3>Total Noticias</h3>
-        <p class="number">{$resumen.totalNoticias}</p>
-      </div>
-      <div class="card">
-        <h3>Medios Diferentes</h3>
-        <p class="number">{$resumen.porMedio.length}</p>
+      <div class="quick-filters">
+        <span class="quick-filters-label">Filtros rapidos:</span>
+        <button on:click={filtrarHoy} class="btn-quick">Hoy</button>
+        <button on:click={filtrarUltimos7Dias} class="btn-quick">Ultimos 7 dias</button>
+        <button on:click={filtrarUltimos30Dias} class="btn-quick">Ultimos 30 dias</button>
+        <button on:click={filtrarTodo} class="btn-quick">Todo el historial</button>
       </div>
     </section>
 
-    <!-- Gráficos -->
+    <section class="summary-cards">
+      <div class="summary-card">
+        <div class="summary-card-icon summary-card-icon--news">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9h4"/>
+            <path d="M10 6h4M10 10h4M10 14h4"/>
+          </svg>
+        </div>
+        <div class="summary-card-content">
+          <span class="summary-card-label">Total Noticias</span>
+          <span class="summary-card-value">{$resumen.totalNoticias}</span>
+        </div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-card-icon summary-card-icon--media">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </div>
+        <div class="summary-card-content">
+          <span class="summary-card-label">Medios Diferentes</span>
+          <span class="summary-card-value">{$resumen.porMedio.length}</span>
+        </div>
+      </div>
+    </section>
+
     <section class="charts-grid">
-      <!-- Noticias por Medio (FILA COMPLETA) -->
       {#if $resumen.porMedio.length > 0}
-        <div class="chart-container full-width">
-          <h3>📰 Noticias por Medio</h3>
+        <div class="chart-card full-width">
+          <h3 class="chart-title">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="chart-icon">
+              <rect x="2" y="8" width="3" height="10"/>
+              <rect x="8.5" y="5" width="3" height="13"/>
+              <rect x="15" y="2" width="3" height="16"/>
+            </svg>
+            Noticias por Medio
+          </h3>
           <div class="chart-wrapper">
             <Bar
               data={{
@@ -303,8 +309,8 @@
                 datasets: [{
                   label: 'Noticias',
                   data: $resumen.porMedio.map(m => m.cantidad),
-                  backgroundColor: colors.blue,
-                  borderColor: colors.blue,
+                  backgroundColor: colors.accent,
+                  borderColor: colors.accent,
                   borderWidth: 1
                 }]
               }}
@@ -313,22 +319,28 @@
           </div>
         </div>
       {:else}
-        <div class="chart-container full-width">
-          <p>⚠️ No hay datos de medios</p>
+        <div class="chart-card full-width">
+          <p class="chart-empty">No hay datos de medios disponibles</p>
         </div>
       {/if}
 
-      <!-- Sentimiento -->
       {#if $resumen.porSentimiento.length > 0}
-        <div class="chart-container">
-          <h3>😊 Análisis de Sentimiento</h3>
+        <div class="chart-card">
+          <h3 class="chart-title">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="chart-icon">
+              <circle cx="10" cy="10" r="9"/>
+              <path d="M7 8h0M13 8h0"/>
+              <path d="M6 13c1.5 2 4 3 6.5 2.5S17 14 18 12"/>
+            </svg>
+            Analisis de Sentimiento
+          </h3>
           <div class="chart-wrapper">
             <Doughnut
               data={{
                 labels: $resumen.porSentimiento.map(s => s.sentimiento),
                 datasets: [{
                   data: $resumen.porSentimiento.map(s => s.cantidad),
-                  backgroundColor: [colors.green, colors.red, colors.yellow, colors.gray, colors.blue],
+                  backgroundColor: [colors.emerald, colors.rose, colors.amber, colors.slate, colors.accent],
                   borderWidth: 1
                 }]
               }}
@@ -337,15 +349,19 @@
           </div>
         </div>
       {:else}
-        <div class="chart-container">
-          <p>⚠️ No hay datos de sentimiento</p>
+        <div class="chart-card">
+          <p class="chart-empty">No hay datos de sentimiento disponibles</p>
         </div>
       {/if}
 
-      <!-- Clasificación -->
       {#if $resumen.porClasificacion.length > 0}
-        <div class="chart-container">
-          <h3>🏷️ Clasificación de Noticias</h3>
+        <div class="chart-card">
+          <h3 class="chart-title">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="chart-icon">
+              <path d="M4 4h12v12H4z"/><path d="M8 8h4M8 12h4"/>
+            </svg>
+            Clasificacion de Noticias
+          </h3>
           <div class="chart-wrapper">
             <Bar
               data={{
@@ -353,8 +369,8 @@
                 datasets: [{
                   label: 'Cantidad',
                   data: $resumen.porClasificacion.map(c => c.cantidad),
-                  backgroundColor: colors.purple,
-                  borderColor: colors.purple,
+                  backgroundColor: colors.primary,
+                  borderColor: colors.primary,
                   borderWidth: 1
                 }]
               }}
@@ -363,15 +379,20 @@
           </div>
         </div>
       {:else}
-        <div class="chart-container">
-          <p>⚠️ No hay datos de clasificación</p>
+        <div class="chart-card">
+          <p class="chart-empty">No hay datos de clasificacion disponibles</p>
         </div>
       {/if}
 
-      <!-- Menciones por Persona -->
       {#if $resumen.mencionesPersonas.length > 0}
-        <div class="chart-container">
-          <h3>👥 Menciones por Persona</h3>
+        <div class="chart-card">
+          <h3 class="chart-title">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="chart-icon">
+              <path d="M14 5a3 3 0 11-6 0 3 3 0 016 0z"/>
+              <path d="M2 17c0-3.3 3.6-6 8-6s8 2.7 8 6"/>
+            </svg>
+            Menciones por Persona
+          </h3>
           <div class="chart-wrapper">
             <Bar
               data={{
@@ -379,8 +400,8 @@
                 datasets: [{
                   label: 'Menciones',
                   data: $resumen.mencionesPersonas.map(p => p.menciones),
-                  backgroundColor: colors.orange,
-                  borderColor: colors.orange,
+                  backgroundColor: colors.teal,
+                  borderColor: colors.teal,
                   borderWidth: 1
                 }]
               }}
@@ -389,8 +410,8 @@
           </div>
         </div>
       {:else}
-        <div class="chart-container">
-          <p>⚠️ No hay datos de menciones</p>
+        <div class="chart-card">
+          <p class="chart-empty">No hay datos de menciones disponibles</p>
         </div>
       {/if}
     </section>
@@ -398,67 +419,87 @@
 </div>
 
 <style>
-   .dashboard {
-     max-width: 1600px;
-     margin: 0 auto;
-     padding: 30px;
-     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-   }
+  .dashboard {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 30px;
+  }
 
-  header {
+  .page-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
-    padding-bottom: 20px;
-    border-bottom: 2px solid #e1e4e8;
-    background: white;
-    padding: 20px 30px;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    margin-bottom: 24px;
+    padding: 24px 30px;
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    border-left: 4px solid var(--color-accent);
   }
 
-  .header-left h1 {
-    color: #24292e;
+  .header-content h1 {
     margin: 0;
     font-size: 24px;
+    color: var(--color-primary);
+    letter-spacing: -0.3px;
   }
 
-  .header-right {
+  .header-subtitle {
+    margin: 4px 0 0;
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    font-family: var(--font-body);
+  }
+
+  .btn-reload {
     display: flex;
-    gap: 10px;
-  }
-
-  button {
-    background: #0366d6;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: var(--color-primary);
     color: white;
     border: none;
-    padding: 10px 20px;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     cursor: pointer;
     font-size: 14px;
     font-weight: 500;
+    font-family: var(--font-body);
     transition: background 0.2s;
+    white-space: nowrap;
   }
 
-  button:hover:not(:disabled) {
-    background: #0255b3;
+  .btn-reload:hover:not(:disabled) {
+    background: var(--color-primary-light);
   }
 
-  button:disabled {
-    background: #94c4f7;
+  .btn-reload:disabled {
+    opacity: 0.6;
     cursor: not-allowed;
-    opacity: 0.7;
   }
 
-  /* 🔍 Sección de Filtros */
-  .filters-section {
-    background: white;
-    border: 1px solid #e1e4e8;
-    border-radius: 8px;
-    padding: 20px 25px;
-    margin-bottom: 20px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  .btn-icon, .spinner-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .spinner-icon {
+    animation: spin 1.5s linear infinite;
+  }
+
+  .card {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+  }
+
+  .filters-card {
+    padding: 24px 28px;
+    margin-bottom: 24px;
   }
 
   .filters-header {
@@ -466,88 +507,111 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
-    padding-bottom: 15px;
-    border-bottom: 1px solid #e1e4e8;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--color-border);
     flex-wrap: wrap;
-    gap: 15px;
+    gap: 12px;
   }
 
-  .filters-title {
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     margin: 0;
     font-size: 16px;
-    color: #24292e;
-    font-weight: 600;
+    color: var(--color-primary);
+    font-weight: 700;
+  }
+
+  .section-icon {
+    width: 18px;
+    height: 18px;
+    color: var(--color-accent);
+    flex-shrink: 0;
   }
 
   .filters-actions {
     display: flex;
-    gap: 10px;
+    gap: 8px;
   }
 
-  .filters-actions .btn-apply {
-    background: #28a745;
-    padding: 8px 16px;
+  .btn {
+    padding: 8px 18px;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
     font-size: 13px;
+    font-weight: 500;
+    font-family: var(--font-body);
+    transition: all 0.2s;
   }
 
-  .filters-actions .btn-apply:hover {
-    background: #218838;
+  .btn-primary {
+    background: var(--color-accent);
+    color: var(--color-primary-dark);
   }
 
-  .filters-actions .btn-clear {
-    background: #6c757d;
-    padding: 8px 16px;
-    font-size: 13px;
+  .btn-primary:hover {
+    background: var(--color-accent-light);
   }
 
-  .filters-actions .btn-clear:hover {
-    background: #5a6268;
+  .btn-secondary {
+    background: var(--color-border);
+    color: var(--color-text-secondary);
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    background: #d1d5db;
+  }
+
+  .btn-secondary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .filters-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 20px;
+    gap: 16px;
+    margin-bottom: 16px;
   }
 
-  .filters-group {
+  .filter-group {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     min-width: 0;
   }
 
-  .filters-group label {
-    font-size: 13px;
+  .filter-group label {
+    font-size: 12px;
     font-weight: 600;
-    color: #586069;
-    white-space: nowrap;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
 
-  .date-input,
-  .select-input {
+  .input {
     padding: 10px 12px;
-    border: 1px solid #d1d5da;
-    border-radius: 6px;
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-md);
     font-size: 14px;
-    font-family: inherit;
-    cursor: pointer;
-    background: white;
+    font-family: var(--font-body);
+    background: var(--color-surface);
     width: 100%;
     box-sizing: border-box;
     transition: border-color 0.2s, box-shadow 0.2s;
+    color: var(--color-text);
   }
 
-  .date-input:hover,
-  .select-input:hover {
-    border-color: #0366d6;
+  .input:hover {
+    border-color: var(--color-primary-light);
   }
 
-  .date-input:focus,
-  .select-input:focus {
+  .input:focus {
     outline: none;
-    border-color: #0366d6;
-    box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.15);
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.15);
   }
 
   .select-wrapper {
@@ -562,154 +626,184 @@
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
   }
 
   .btn-clear-small {
     position: absolute;
     right: 8px;
-    background: #e1e4e8;
-    color: #586069;
+    background: var(--color-border);
+    color: var(--color-text-secondary);
     border: none;
     width: 22px;
     height: 22px;
     padding: 0;
-    font-size: 11px;
     cursor: pointer;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    transition: background 0.2s, color 0.2s;
+    transition: all 0.2s;
   }
 
   .btn-clear-small:hover {
-    background: #c5221f;
+    background: var(--color-error);
     color: white;
   }
 
-  /* ⚡ Filtros Rápidos */
+  .btn-clear-small svg {
+    width: 12px;
+    height: 12px;
+  }
+
   .quick-filters {
-    background: white;
-    border: 1px solid #e1e4e8;
-    border-radius: 8px;
-    padding: 15px 25px;
-    margin-bottom: 20px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 8px;
     align-items: center;
+    padding-top: 4px;
   }
 
   .quick-filters-label {
-    font-size: 14px;
-    font-weight: 600;
-    color: #586069;
-    margin-right: 10px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text-muted);
+    margin-right: 4px;
   }
 
   .btn-quick {
-    background: #f6f8fa;
-    color: #24292e;
-    border: 1px solid #e1e4e8;
-    padding: 8px 16px;
+    padding: 6px 14px;
+    background: var(--color-bg);
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 20px;
+    cursor: pointer;
     font-size: 13px;
-    border-radius: 6px;
+    font-weight: 500;
+    font-family: var(--font-body);
+    transition: all 0.2s;
   }
 
   .btn-quick:hover {
-    background: #e1e4e8;
-    border-color: #d1d5da;
+    background: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
   }
 
-  .error {
-    background: #ffeef0;
-    border: 1px solid #fdaeb7;
-    color: #c5221f;
-    padding: 15px;
-    border-radius: 6px;
-    margin-bottom: 20px;
-  }
-
-  .loading {
-    text-align: center;
-    padding: 50px;
-    color: #586069;
-    background: white;
-    border-radius: 8px;
-  }
-
-  /* Tarjetas de Resumen */
-  .cards {
+  .summary-cards {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 20px;
-    margin-bottom: 30px;
+    margin-bottom: 24px;
   }
 
-  .card {
-    background: white;
-    border: 1px solid #e1e4e8;
-    border-radius: 8px;
-    padding: 25px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  .summary-card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    box-shadow: var(--shadow-md);
     transition: transform 0.2s, box-shadow 0.2s;
+    border-top: 3px solid var(--color-accent);
   }
 
-  .card:hover {
+  .summary-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    box-shadow: var(--shadow-lg);
   }
 
-  .card h3 {
-    margin: 0 0 10px 0;
-    color: #586069;
-    font-size: 14px;
+  .summary-card-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .summary-card-icon svg {
+    width: 26px;
+    height: 26px;
+  }
+
+  .summary-card-icon--news {
+    background: rgba(107, 29, 42, 0.1);
+    color: var(--color-primary);
+  }
+
+  .summary-card-icon--media {
+    background: rgba(201, 168, 76, 0.15);
+    color: var(--color-accent-dark);
+  }
+
+  .summary-card-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .summary-card-label {
+    font-size: 13px;
     font-weight: 500;
+    color: var(--color-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
 
-  .card .number {
-    margin: 0;
+  .summary-card-value {
+    font-family: var(--font-heading);
     font-size: 36px;
-    font-weight: 700;
-    color: #24292e;
+    font-weight: 800;
+    color: var(--color-primary);
+    line-height: 1.1;
   }
 
-  /* Grid de Gráficos */
   .charts-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 25px;
+    gap: 24px;
     margin-bottom: 30px;
   }
 
-  .chart-container {
-    background: white;
-    border: 1px solid #e1e4e8;
-    border-radius: 8px;
+  .chart-card {
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
     padding: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    height: 350px;
+    box-shadow: var(--shadow-md);
+    height: 380px;
     position: relative;
     display: flex;
     flex-direction: column;
     overflow: hidden;
   }
 
-  .chart-container.full-width {
+  .chart-card.full-width {
     grid-column: 1 / -1;
   }
 
-  .chart-container h3 {
-    margin: 0 0 15px 0;
-    color: #24292e;
-    font-size: 16px;
-    font-weight: 600;
-    border-bottom: 1px solid #e1e4e8;
-    padding-bottom: 12px;
+  .chart-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 12px;
+    font-size: 15px;
+    color: var(--color-primary);
+    font-weight: 700;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
+  }
+
+  .chart-icon {
+    width: 18px;
+    height: 18px;
+    color: var(--color-accent);
     flex-shrink: 0;
   }
 
@@ -720,14 +814,53 @@
     overflow: hidden;
   }
 
-  .chart-container p {
+  .chart-empty {
     text-align: center;
-    color: #586069;
-    margin-top: 100px;
+    color: var(--color-text-muted);
+    margin: auto;
     font-size: 14px;
   }
 
-  /* Responsive */
+  .error {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--color-error-bg);
+    border: 1px solid var(--color-error-border);
+    color: var(--color-error);
+    padding: 14px 18px;
+    border-radius: var(--radius-md);
+    margin-bottom: 20px;
+    font-size: 14px;
+  }
+
+  .error-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+
+  .loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 60px;
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    color: var(--color-text-secondary);
+    font-size: 15px;
+  }
+
+  .spinner-large {
+    width: 36px;
+    height: 36px;
+    border: 3px solid var(--color-border);
+    border-top-color: var(--color-accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
   @media (max-width: 1200px) {
     .filters-grid {
       grid-template-columns: repeat(2, 1fr);
@@ -738,29 +871,23 @@
     .charts-grid {
       grid-template-columns: 1fr;
     }
-    
-    .cards {
+    .summary-cards {
       grid-template-columns: 1fr;
     }
-    
-    .chart-container,
-    .chart-container.full-width {
+    .chart-card,
+    .chart-card.full-width {
       grid-column: 1 / -1;
     }
-    
-    .chart-container {
-      height: 320px;
+    .chart-card {
+      height: 340px;
     }
-
     .filters-header {
       flex-direction: column;
       align-items: flex-start;
     }
-
     .filters-actions {
       width: 100%;
     }
-
     .filters-actions button {
       flex: 1;
     }
@@ -768,48 +895,41 @@
 
   @media (max-width: 640px) {
     .dashboard {
-      padding: 15px;
+      padding: 16px;
     }
-    
-    header {
+    .page-header {
       flex-direction: column;
-      gap: 15px;
+      gap: 12px;
       text-align: center;
+      padding: 20px;
     }
-    
-    .cards {
+    .header-subtitle {
+      font-size: 13px;
+    }
+    .btn-reload {
+      width: 100%;
+      justify-content: center;
+    }
+    .summary-cards {
       grid-template-columns: 1fr;
     }
-    
-    .chart-container,
-    .chart-container.full-width {
+    .summary-card {
+      flex-direction: column;
+      text-align: center;
+    }
+    .chart-card,
+    .chart-card.full-width {
       height: 300px;
     }
-
     .quick-filters {
       flex-direction: column;
       align-items: stretch;
     }
-
-    .quick-filters-label {
-      margin-right: 0;
-      margin-bottom: 10px;
-    }
-
-    .btn-quick {
-      width: 100%;
-    }
-
     .filters-grid {
       grid-template-columns: 1fr;
     }
-
     .filters-actions {
       flex-direction: column;
-    }
-
-    .filters-actions button {
-      width: 100%;
     }
   }
 </style>

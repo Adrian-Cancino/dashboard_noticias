@@ -9,9 +9,9 @@
       <svg class="brand-icon" viewBox="0 0 32 32" fill="none">
         <rect width="32" height="32" rx="6" fill="var(--color-accent)"/>
         <path d="M16 5l11 6v6c0 6-4.5 11.5-11 12-6.5-.5-11-6-11-12v-6l11-6z" fill="var(--color-primary)" stroke="var(--color-accent)" stroke-width="1.2" stroke-linejoin="round"/>
-        <text x="16" y="21" text-anchor="middle" fill="var(--color-accent)" font-size="10" font-weight="bold" font-family="Georgia, serif">SLP</text>
+        <text x="16" y="22" text-anchor="middle" fill="var(--color-accent)" font-size="14" font-weight="bold" font-family="Georgia, serif">M</text>
       </svg>
-      <span class="brand-text">Dashboard Electoral <span class="brand-highlight">SLP</span></span>
+      <span class="brand-text">Dashboard Electoral <span class="brand-highlight">Michoacán</span></span>
     </a>
     <div class="nav-links">
       <a href="/" class="nav-link" class:active={!$page.url.pathname || $page.url.pathname === '/'}>
